@@ -27,16 +27,34 @@ client_socket.send(username_header + username)
 
 while True:
 
-    # Wait for user to input a message
-    message = input(f'{my_username} > ')
+    print("Type Message type: 1 for broadcast, 2 for private massage:")
+    m_type = input(f'{my_username} > ')
 
-    # If message is not empty - send it
-    if message:
+    if m_type != ('1' or '2'):
+        print("Not a valid option, try again")  
+
+    if m_type == '1':
+        message = input(f'{my_username} > '+ "Message broadcast:")
+
+    if m_type == '2':
+      print(f'{my_username} > ' + "Private Message:")
+      message = input(f'{my_username} > ')
+     
+    
+    # Wait for user to input a message
+    
+
+    # If message is not empty and broadcast - send it
+    if message and m_type == '1':
 
         # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
         message = message.encode('utf-8')
         message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-        client_socket.send(message_header + message)
+        client_socket.send(message_header + m_type.encode() + message)
+   
+    if message and m_type == '2':
+        print("DO SOMETHING TO SEND PRIVATELY")
+    
 
     try:
         # Now we want to loop over received messages (there might be more than one) and print them
