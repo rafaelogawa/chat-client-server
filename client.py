@@ -1,8 +1,9 @@
-import socket
+import socket, sys
 import select
 import errno
 
 HEADER_LENGTH = 10
+USER_LENGTH = 15
 
 IP = "127.0.0.1"
 PORT = 1234
@@ -25,41 +26,38 @@ username = my_username.encode('utf-8')
 username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
 client_socket.send(username_header + username)
 
+valid_options = ['1', '2']
+
 while True:
+    try:
+        print("Type Message type: 1 for broadcast, 2 for private massage:")
+        m_type = input(f'{my_username} > ')
 
-    print("Type Message type: 1 for broadcast, 2 for private massage:")
-    m_type = input(f'{my_username} > ')
+        if m_type not in valid_options:
+            pass
 
-    if m_type != ('1' or '2'):
-        print("Not a valid option, try again")  
+        if(m_type == '1'):
+            message = input(f'{my_username} > '+ "Message broadcast:")
 
-    if m_type == '1':
-        message = input(f'{my_username} > '+ "Message broadcast:")
+        if(m_type == '2'):
+            message_dst = input(f'{my_username} > ' + "Private Message to: ")
+            message = input(f'{my_username} > ' + "Message: ")
 
-    if m_type == '2':
-      print(f'{my_username} > ' + "Private Message:")
-      message = input(f'{my_username} > ')
-     
-    
-    # Wait for user to input a message
-    
+        if message and m_type == '1':
+            # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+            message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+            client_socket.send(message_header + m_type.encode() + message.encode('utf-8'))
 
-    # If message is not empty and broadcast - send it
-    if message and m_type == '1':
-
-        # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-        message = message.encode('utf-8')
-        message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-        client_socket.send(message_header + m_type.encode() + message)
-   
-    if message and m_type == '2':
-        print("DO SOMETHING TO SEND PRIVATELY")
-    
+        if message and m_type == '2':
+            message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+            message_dst = f"{(message_dst):<{USER_LENGTH}}".encode('utf-8')
+            client_socket.send(message_header + m_type.encode() + message_dst + message.encode('utf-8'))
+    except:
+        pass
 
     try:
         # Now we want to loop over received messages (there might be more than one) and print them
         while True:
-
             # Receive our "header" containing username length, it's size is defined and constant
             username_header = client_socket.recv(HEADER_LENGTH)
 
@@ -70,14 +68,19 @@ while True:
 
             # Convert header to int value
             username_length = int(username_header.decode('utf-8').strip())
+            print("username_length: {}".format(username_length))
 
             # Receive and decode username
             username = client_socket.recv(username_length).decode('utf-8')
+            print("username: {}".format(username))
 
             # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
             message_header = client_socket.recv(HEADER_LENGTH)
+            print("message_header: {}".format(message_header))
             message_length = int(message_header.decode('utf-8').strip())
+            print("message_length: {}".format(message_length))
             message = client_socket.recv(message_length).decode('utf-8')
+            print("message: {}".format(message))
 
             # Print message
             print(f'{username} > {message}')
