@@ -1,9 +1,7 @@
-import socket, sys
+import socket, sys, threading
 import select
 import errno
-
-HEADER_LENGTH = 10
-USER_LENGTH = 15
+from config import *
 
 IP = "127.0.0.1"
 PORT = 1234
@@ -28,76 +26,91 @@ client_socket.send(username_header + username)
 
 valid_options = ['1', '2']
 
-while True:
-    try:
-        print("Type Message type: 1 for broadcast, 2 for private massage:")
-        m_type = input(f'{my_username} > ')
+def receive():
+    while(1):
+        try:
+            # Now we want to loop over received messages (there might be more than one) and print them
+            while True:
+                # Receive our "header" containing username length, it's size is defined and constant
+                username_header = client_socket.recv(HEADER_LENGTH)
 
-        if m_type not in valid_options:
-            pass
+                # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
+                if not len(username_header):
+                    print('Connection closed by the server')
+                    sys.exit()
 
-        if(m_type == '1'):
-            message = input(f'{my_username} > '+ "Message broadcast:")
+                # Convert header to int value
+                username_length = int(username_header.decode('utf-8').strip())
+                print("username_length: {}".format(username_length))
 
-        if(m_type == '2'):
-            message_dst = input(f'{my_username} > ' + "Private Message to: ")
-            message = input(f'{my_username} > ' + "Message: ")
+                # Receive and decode username
+                username = client_socket.recv(username_length).decode('utf-8')
+                print("username: {}".format(username))
 
-        if message and m_type == '1':
-            # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-            message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-            client_socket.send(message_header + m_type.encode() + message.encode('utf-8'))
+                # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
+                message_header = client_socket.recv(HEADER_LENGTH)
+                print("message_header: {}".format(message_header))
+                message_length = int(message_header.decode('utf-8').strip())
+                print("message_length: {}".format(message_length))
+                message = client_socket.recv(message_length).decode('utf-8')
+                print("message: {}".format(message))
 
-        if message and m_type == '2':
-            message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-            message_dst = f"{(message_dst):<{USER_LENGTH}}".encode('utf-8')
-            client_socket.send(message_header + m_type.encode() + message_dst + message.encode('utf-8'))
-    except:
-        pass
+                # Print message
+                print(f'{username} > {message}')
 
-    try:
-        # Now we want to loop over received messages (there might be more than one) and print them
-        while True:
-            # Receive our "header" containing username length, it's size is defined and constant
-            username_header = client_socket.recv(HEADER_LENGTH)
-
-            # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-            if not len(username_header):
-                print('Connection closed by the server')
+        except IOError as e:
+            # This is normal on non blocking connections - when there are no incoming data error is going to be raised
+            # Some operating systems will indicate that using AGAIN, and some using WOULDBLOCK error code
+            # We are going to check for both - if one of them - that's expected, means no incoming data, continue as normal
+            # If we got different error code - something happened
+            if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:
+                print('Reading error: {}'.format(str(e)))
                 sys.exit()
 
-            # Convert header to int value
-            username_length = int(username_header.decode('utf-8').strip())
-            print("username_length: {}".format(username_length))
-
-            # Receive and decode username
-            username = client_socket.recv(username_length).decode('utf-8')
-            print("username: {}".format(username))
-
-            # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
-            message_header = client_socket.recv(HEADER_LENGTH)
-            print("message_header: {}".format(message_header))
-            message_length = int(message_header.decode('utf-8').strip())
-            print("message_length: {}".format(message_length))
-            message = client_socket.recv(message_length).decode('utf-8')
-            print("message: {}".format(message))
-
-            # Print message
-            print(f'{username} > {message}')
-
-    except IOError as e:
-        # This is normal on non blocking connections - when there are no incoming data error is going to be raised
-        # Some operating systems will indicate that using AGAIN, and some using WOULDBLOCK error code
-        # We are going to check for both - if one of them - that's expected, means no incoming data, continue as normal
-        # If we got different error code - something happened
-        if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:
-            print('Reading error: {}'.format(str(e)))
+        except Exception as e:
+            # Any other exception - something happened, exit
+            print('Reading error: '.format(str(e)))
             sys.exit()
 
-        # We just did not receive anything
-        continue
+def send():
+    while(1):
+        try:
+            print("Type Message type: 1 for broadcast, 2 for private massage:")
+            m_type = input(f'{my_username} > ')
 
-    except Exception as e:
-        # Any other exception - something happened, exit
-        print('Reading error: '.format(str(e)))
-        sys.exit()
+            if m_type not in valid_options:
+                pass
+
+            if(m_type == '1'):
+                message = input(f'{my_username} > '+ "Message broadcast:")
+
+            if(m_type == '2'):
+                message_dst = input(f'{my_username} > ' + "Private Message to: ")
+                message = input(f'{my_username} > ' + "Message: ")
+
+            if message and m_type == '1':
+                # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+                message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+                client_socket.send(message_header + m_type.encode() + message.encode('utf-8'))
+
+            if message and m_type == '2':
+                message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
+                message_dst = f"{(message_dst):<{USER_LENGTH}}".encode('utf-8')
+                client_socket.send(message_header + m_type.encode() + message_dst + message.encode('utf-8'))
+        except:
+            pass
+
+
+def main():
+    print("Initializating client")
+
+    rec = threading.Thread(target=receive)
+    rec.start()
+    print("Initializating rec")
+
+    sen = threading.Thread(target=send)
+    sen.start()
+    print("Initializating sen")
+
+if __name__ == "__main__":
+    main()

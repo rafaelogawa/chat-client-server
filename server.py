@@ -1,10 +1,6 @@
 import socket
 import select
-
-HEADER_LENGTH = 10
-USER_LENGTH = 15
-MSG_TYPE = 1
-
+from config import *
 IP = "127.0.0.1"
 PORT = 1234
 
@@ -39,6 +35,7 @@ def receive_message(client_socket):
         # Receive our "header" containing message length, it's size is defined and constant
         message_length = client_socket.recv(HEADER_LENGTH)
         message_type = int(client_socket.recv(MSG_TYPE).decode('utf-8'))
+
         if(message_type == 2):
             message_dst = client_socket.recv(USER_LENGTH)
             message_dst = str(message_dst.decode('utf-8').strip())
@@ -60,7 +57,7 @@ def receive_message(client_socket):
         message_length = int(message_length.decode('utf-8').strip())
 
         # Return an object of message header and message data
-        return {'header': message_length, 'type':message_type, 'broadcast': message_dst,'data': data}
+        return {'header': message_length, 'type':message_type, 'broadcast': message_dst, 'data': data}
 
     except:
         # If we are here, client closed connection violently, for example by pressing ctrl+c on his script
@@ -144,7 +141,6 @@ while True:
 
                 # Remove from our list of users
                 del clients[notified_socket]
-
                 continue
 
             # Get user by notified socket, so we will know who sent the message
