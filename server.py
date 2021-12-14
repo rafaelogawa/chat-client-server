@@ -1,6 +1,7 @@
 import socket
 import select
 from config import *
+
 IP = "127.0.0.1"
 PORT = 1234
 
@@ -27,6 +28,9 @@ sockets_list = [server_socket]
 # List of connected clients - socket as a key, user header and name as data
 clients = {}
 
+# Aurelio of all online users
+online_users = {}
+
 print(f'Listening for connections on {IP}:{PORT}...')
 
 # Handles message receiving
@@ -42,22 +46,41 @@ def receive_message(client_socket):
         if(message_opcode == 1):
             message_to = client_socket.recv(USER_LENGTH)
             message_to = "ALL"
+            data = client_socket.recv(DATA_LENGTH)
+
         elif(message_opcode == 2):
             message_to = client_socket.recv(USER_LENGTH)
             message_to = str(message_to.decode('utf-8').strip())
+            data = client_socket.recv(DATA_LENGTH)
+
+        elif(message_opcode == 3):
+            message_to = message_from
+            print(online_users)
+            data = "\n"
+            for i in online_users:
+                data = data + ("{} - {}\n").format(i, online_users[i])
+            data = bytes(data, 'utf-8')
+
+        elif(message_opcode == 4):
+            message_to = message_from.strip()
+            print(online_users)
+            data = """
+
+                     Help Guide
+
+            1 - Broadcast communication
+            2 - Direct communication
+            3 - List all online users
+            4 - Help
+
+            """
+            data = bytes(data, 'utf-8')
+
         else:
             pass
-        
+
         print("message_to: {}".format(message_to))
-
-        data = client_socket.recv(DATA_LENGTH)
-
         print(data)
-
-        # try:
-        #     data = client_socket.recv(int(message_length.decode('utf-8')) + 1)
-        # except Exception as e:
-        #     print(str(e))
 
         # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
         if not data:
@@ -88,9 +111,15 @@ def new_user(client_socket):
 
         # Convert header to int value
         message_length = int(message_header.decode('utf-8').strip())
+        data = client_socket.recv(message_length+1)
 
         # Return an object of message header and message data
-        return {'header': message_header, 'data': client_socket.recv(message_length+1)}
+
+        online_users[str(len(online_users) + 1)] = data.decode('utf-8').strip()
+
+        print("Att all online users.\n{}\n".format(online_users))
+
+        return {'header': message_header, 'data': data}
 
     except:
         # If we are here, client closed connection violently, for example by pressing ctrl+c on his script
@@ -163,15 +192,15 @@ while True:
 
             for client_socket in clients:
                 # But don't sent it to sender
-                if client_socket != notified_socket:
-                    # size of user sender
-                    # usr_header_length = user['header']
-                    # size of user sender
-                    message_opcode = f"{(message['opcode']):<{MSG_OPCODE}}".encode('utf-8')
-                    # size of user sender
-                    message_from = f"{(message['from']):<{USER_LENGTH}}".encode('utf-8')
-                    # size of user sender
-                    message_to = f"{(message['to']):<{USER_LENGTH}}".encode('utf-8')
+
+                # size of user sender
+                message_opcode = f"{(message['opcode']):<{MSG_OPCODE}}".encode('utf-8')
+                # size of user sender
+                message_from = f"{(message['from']):<{USER_LENGTH}}".encode('utf-8')
+                # size of user sender
+                message_to = f"{(message['to']):<{USER_LENGTH}}".encode('utf-8')
+
+                if client_socket != notified_socket:   
                     # name of user sender
                     # usr_sender = user['data']
                     # size of sending message
@@ -191,6 +220,16 @@ while True:
 
                     else:
                         print("nao bateu: {}".format(clients[client_socket]['data']))
+
+                elif int(message['opcode']) == 3 and client_socket == notified_socket:
+                    data = f"{(message['data']).decode('utf-8'):<{DATA_LENGTH}}".encode('utf-8')
+                    client_socket.send(message_opcode + message_from + message_to + message['data'])
+                    break
+
+                elif int(message['opcode']) == 4 and client_socket == notified_socket:
+                    data = f"{(message['data']).decode('utf-8'):<{DATA_LENGTH}}".encode('utf-8')
+                    client_socket.send(message_opcode + message_from + message_to + message['data'])
+                    break
 
     # It's not really necessary to have this, but will handle some socket exceptions just in case
     for notified_socket in exception_sockets:

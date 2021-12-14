@@ -24,7 +24,10 @@ username = my_username.encode('utf-8')
 username_header = f"{len(username):<{DATA_LENGTH}}".encode('utf-8')
 client_socket.send(username_header + username)
 
-valid_options = ['1', '2']
+valid_options = ['1', '2', '3']
+
+def wait_server_answer():
+    print("waiting ...")
 
 def receive():
     while(1):
@@ -68,8 +71,11 @@ def receive():
                 # Print message
                 if(int(message_opcode) == 1):
                     message_type = "pv"
-                if(int(message_opcode) == 2):
+                elif(int(message_opcode) == 2):
                     message_type = "all"
+                elif(int(message_opcode) == 3):
+                    message_type = "info"
+                
 
                 print(f'{message_from} ({message_type}) > {data}')
 
@@ -104,34 +110,48 @@ def send():
                 message_to = input(f'{my_username} > ' + "Private Message to: ")
                 message = input(f'{my_username} > ' + "Message: ")
 
-            if message and message_opcode == '1':
+            if message_opcode == '1':
+                if message :
+                    # print(username)
+                    # print(f"{(username).decode('utf-8'):<{USER_LENGTH}}")
+                    # print("\n")
+                    # print(f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8'))
+                    # print("\n")
+                    # print(f"{(message_to):<{USER_LENGTH}}".encode('utf-8'))
+                    # print("\n")
+                    # print(f"{(message):<{DATA_LENGTH}}".encode('utf-8'))
 
-                print(username)
-                print(f"{(username).decode('utf-8'):<{USER_LENGTH}}")
-                print("\n")
-                print(f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8'))
-                print("\n")
-                print(f"{(message_to):<{USER_LENGTH}}".encode('utf-8'))
-                print("\n")
-                print(f"{(message):<{DATA_LENGTH}}".encode('utf-8'))
+                    # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+                    message_opcode = bytes(message_opcode, 'utf-8')
+                    message_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
+                    message_to = f"{(message_to):<{USER_LENGTH}}".encode('utf-8')
+                    message = f"{(message):<{DATA_LENGTH}}".encode('utf-8')
+                    client_socket.send(message_opcode + message_from + message_to + message)
 
-                # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+            if message_opcode == '2':
+                if message:
+                    message_opcode = bytes(message_opcode, 'utf-8')
+                    message_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
+                    message_to = f"{(message_to):<{USER_LENGTH}}".encode('utf-8')
+                    message = f"{(message):<{DATA_LENGTH}}".encode('utf-8')
+                    client_socket.send(message_opcode + message_from + message_to + message)
+            
+            if message_opcode == '3':
                 message_opcode = bytes(message_opcode, 'utf-8')
-                messa_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
-                message_to = f"{(message_to):<{USER_LENGTH}}".encode('utf-8')
-                message = f"{(message):<{DATA_LENGTH}}".encode('utf-8')
-                client_socket.send(message_opcode + messa_from + message_to + message)
+                empty_data = f"{'':<{USER_LENGTH + DATA_LENGTH}}".encode('utf-8')
+                message_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
+                client_socket.send(message_opcode + message_from + empty_data)
+                wait_server_answer()
 
-            if message and message_opcode == '2':
+            if message_opcode == '4':
                 message_opcode = bytes(message_opcode, 'utf-8')
-                messa_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
-                message_to = f"{(message_to):<{USER_LENGTH}}".encode('utf-8')
-                message = f"{(message):<{DATA_LENGTH}}".encode('utf-8')
-                client_socket.send(message_opcode + messa_from + message_to + message)
+                empty_data = f"{'':<{USER_LENGTH + DATA_LENGTH}}".encode('utf-8')
+                message_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
+                client_socket.send(message_opcode + message_from + empty_data)
+                wait_server_answer()
 
         except Exception as e:
             print(str(e))
-
 
 def main():
     print("Initializating client")
