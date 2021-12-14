@@ -2,6 +2,7 @@ import socket, sys, threading
 import select
 import errno
 from config import *
+import time
 
 IP = "127.0.0.1"
 PORT = 1234
@@ -32,33 +33,23 @@ def wait_server_answer():
 def receive():
     while(1):
         try:
-            # Now we want to loop over received messages (there might be more than one) and print them
             while True:
-                # Receive our "header" containing username length, it's size is defined and constant
                 message_opcode = client_socket.recv(MSG_OPCODE).decode('utf-8').strip()
-                print("message_opcode: {}".format(message_opcode))
+                # print("message_opcode: {}".format(message_opcode))
 
                 # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
                 if not message_opcode:
-                    print('Connection closed by the server')
+                    # print('Connection closed by the server')
                     sys.exit()
 
                 message_from = client_socket.recv(USER_LENGTH).decode('utf-8').strip()
-                print("message_from: {}".format(message_from))
+                # print("message_from: {}".format(message_from))
 
                 message_to = client_socket.recv(USER_LENGTH).decode('utf-8').strip()
-                print("message_to: {}".format(message_to))
+                # print("message_to: {}".format(message_to))
 
                 data = client_socket.recv(DATA_LENGTH).decode('utf-8').strip()
-                print("data: {}".format(data))
-
-                # Convert header to int value
-                # username_length = int(username_header.decode('utf-8').strip())
-                # print("username_length: {}".format(username_length))
-
-                # Receive and decode username
-                # username = client_socket.recv(username_length).decode('utf-8')
-                # print("username: {}".format(username))
+                # print("data: {}".format(data))
 
                 # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
                 # message_header = client_socket.recv(DATA_LENGTH)
@@ -70,13 +61,14 @@ def receive():
 
                 # Print message
                 if(int(message_opcode) == 1):
-                    message_type = "pv"
-                elif(int(message_opcode) == 2):
                     message_type = "all"
+                elif(int(message_opcode) == 2):
+                    message_type = "pv"
                 elif(int(message_opcode) == 3):
                     message_type = "info"
+                elif(int(message_opcode) == 4):
+                    message_type = "info"
                 
-
                 print(f'{message_from} ({message_type}) > {data}')
 
         except IOError as e:
@@ -96,7 +88,6 @@ def receive():
 def send():
     while(1):
         try:
-            print("Type Message type: 1 for broadcast, 2 for private massage:")
             message_opcode = input(f'{my_username} > ')
 
             if message_opcode not in valid_options:
@@ -136,18 +127,12 @@ def send():
                     message = f"{(message):<{DATA_LENGTH}}".encode('utf-8')
                     client_socket.send(message_opcode + message_from + message_to + message)
             
-            if message_opcode == '3':
+            if message_opcode == '3' or message_opcode == '4':
                 message_opcode = bytes(message_opcode, 'utf-8')
-                empty_data = f"{'':<{USER_LENGTH + DATA_LENGTH}}".encode('utf-8')
+                empty_data = f"{'':<{DATA_LENGTH}}".encode('utf-8')
                 message_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
-                client_socket.send(message_opcode + message_from + empty_data)
-                wait_server_answer()
-
-            if message_opcode == '4':
-                message_opcode = bytes(message_opcode, 'utf-8')
-                empty_data = f"{'':<{USER_LENGTH + DATA_LENGTH}}".encode('utf-8')
-                message_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
-                client_socket.send(message_opcode + message_from + empty_data)
+                message_to = f"{(SERVER_BOT):<{USER_LENGTH}}".encode('utf-8')
+                client_socket.send(message_opcode + message_from + message_to + empty_data)
                 wait_server_answer()
 
         except Exception as e:
@@ -163,6 +148,9 @@ def main():
     sen = threading.Thread(target=send)
     sen.start()
     print("Initializating sen")
+
+    time.sleep(2)
+    print("Type Message type:\n    1 - Broadcast message\n    2 - Private massage\n    3 - List online users\n    4 - Help guide")
 
 if __name__ == "__main__":
     main()
