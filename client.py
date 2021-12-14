@@ -21,7 +21,7 @@ client_socket.setblocking(False)
 # Prepare username and header and send them
 # We need to encode username to bytes, then count number of bytes and prepare header of fixed size, that we encode to bytes as well
 username = my_username.encode('utf-8')
-username_header = f"{len(username):<{HEADER_LENGTH}}".encode('utf-8')
+username_header = f"{len(username):<{DATA_LENGTH}}".encode('utf-8')
 client_socket.send(username_header + username)
 
 valid_options = ['1', '2']
@@ -32,31 +32,46 @@ def receive():
             # Now we want to loop over received messages (there might be more than one) and print them
             while True:
                 # Receive our "header" containing username length, it's size is defined and constant
-                username_header = client_socket.recv(HEADER_LENGTH)
+                message_opcode = client_socket.recv(MSG_OPCODE).decode('utf-8').strip()
+                print("message_opcode: {}".format(message_opcode))
 
                 # If we received no data, server gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-                if not len(username_header):
+                if not message_opcode:
                     print('Connection closed by the server')
                     sys.exit()
 
+                message_from = client_socket.recv(USER_LENGTH).decode('utf-8').strip()
+                print("message_from: {}".format(message_from))
+
+                message_to = client_socket.recv(USER_LENGTH).decode('utf-8').strip()
+                print("message_to: {}".format(message_to))
+
+                data = client_socket.recv(DATA_LENGTH).decode('utf-8').strip()
+                print("data: {}".format(data))
+
                 # Convert header to int value
-                username_length = int(username_header.decode('utf-8').strip())
-                print("username_length: {}".format(username_length))
+                # username_length = int(username_header.decode('utf-8').strip())
+                # print("username_length: {}".format(username_length))
 
                 # Receive and decode username
-                username = client_socket.recv(username_length).decode('utf-8')
-                print("username: {}".format(username))
+                # username = client_socket.recv(username_length).decode('utf-8')
+                # print("username: {}".format(username))
 
                 # Now do the same for message (as we received username, we received whole message, there's no need to check if it has any length)
-                message_header = client_socket.recv(HEADER_LENGTH)
-                print("message_header: {}".format(message_header))
-                message_length = int(message_header.decode('utf-8').strip())
-                print("message_length: {}".format(message_length))
-                message = client_socket.recv(message_length).decode('utf-8')
-                print("message: {}".format(message))
+                # message_header = client_socket.recv(DATA_LENGTH)
+                # print("message_header: {}".format(message_header))
+                # message_length = int(message_header.decode('utf-8').strip())
+                # print("message_length: {}".format(message_length))
+                # message = client_socket.recv(message_length).decode('utf-8')
+                # print("message: {}".format(message))
 
                 # Print message
-                print(f'{username} > {message}')
+                if(int(message_opcode) == 1):
+                    message_type = "pv"
+                if(int(message_opcode) == 2):
+                    message_type = "all"
+
+                print(f'{message_from} ({message_type}) > {data}')
 
         except IOError as e:
             # This is normal on non blocking connections - when there are no incoming data error is going to be raised
@@ -76,29 +91,46 @@ def send():
     while(1):
         try:
             print("Type Message type: 1 for broadcast, 2 for private massage:")
-            m_type = input(f'{my_username} > ')
+            message_opcode = input(f'{my_username} > ')
 
-            if m_type not in valid_options:
+            if message_opcode not in valid_options:
                 pass
 
-            if(m_type == '1'):
+            if(message_opcode == '1'):
                 message = input(f'{my_username} > '+ "Message broadcast:")
+                message_to = "ALL"
 
-            if(m_type == '2'):
-                message_dst = input(f'{my_username} > ' + "Private Message to: ")
+            if(message_opcode == '2'):
+                message_to = input(f'{my_username} > ' + "Private Message to: ")
                 message = input(f'{my_username} > ' + "Message: ")
 
-            if message and m_type == '1':
-                # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
-                message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-                client_socket.send(message_header + m_type.encode() + message.encode('utf-8'))
+            if message and message_opcode == '1':
 
-            if message and m_type == '2':
-                message_header = f"{len(message):<{HEADER_LENGTH}}".encode('utf-8')
-                message_dst = f"{(message_dst):<{USER_LENGTH}}".encode('utf-8')
-                client_socket.send(message_header + m_type.encode() + message_dst + message.encode('utf-8'))
-        except:
-            pass
+                print(username)
+                print(f"{(username).decode('utf-8'):<{USER_LENGTH}}")
+                print("\n")
+                print(f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8'))
+                print("\n")
+                print(f"{(message_to):<{USER_LENGTH}}".encode('utf-8'))
+                print("\n")
+                print(f"{(message):<{DATA_LENGTH}}".encode('utf-8'))
+
+                # Encode message to bytes, prepare header and convert to bytes, like for username above, then send
+                message_opcode = bytes(message_opcode, 'utf-8')
+                messa_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
+                message_to = f"{(message_to):<{USER_LENGTH}}".encode('utf-8')
+                message = f"{(message):<{DATA_LENGTH}}".encode('utf-8')
+                client_socket.send(message_opcode + messa_from + message_to + message)
+
+            if message and message_opcode == '2':
+                message_opcode = bytes(message_opcode, 'utf-8')
+                messa_from = f"{(username).decode('utf-8'):<{USER_LENGTH}}".encode('utf-8')
+                message_to = f"{(message_to):<{USER_LENGTH}}".encode('utf-8')
+                message = f"{(message):<{DATA_LENGTH}}".encode('utf-8')
+                client_socket.send(message_opcode + messa_from + message_to + message)
+
+        except Exception as e:
+            print(str(e))
 
 
 def main():

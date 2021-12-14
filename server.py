@@ -33,43 +33,54 @@ print(f'Listening for connections on {IP}:{PORT}...')
 def receive_message(client_socket):
     try:
         # Receive our "header" containing message length, it's size is defined and constant
-        message_length = client_socket.recv(HEADER_LENGTH)
-        message_type = int(client_socket.recv(MSG_TYPE).decode('utf-8'))
+        message_opcode = int(client_socket.recv(MSG_OPCODE).decode('utf-8'))
+        print("message_opcode: {}".format(message_opcode))
 
-        if(message_type == 2):
-            message_dst = client_socket.recv(USER_LENGTH)
-            message_dst = str(message_dst.decode('utf-8').strip())
+        message_from = client_socket.recv(USER_LENGTH).decode('utf-8')
+        print("message_from: {}".format(message_from))
+
+        if(message_opcode == 1):
+            message_to = client_socket.recv(USER_LENGTH)
+            message_to = "ALL"
+        elif(message_opcode == 2):
+            message_to = client_socket.recv(USER_LENGTH)
+            message_to = str(message_to.decode('utf-8').strip())
         else:
-            message_dst = "ALL"
+            pass
+        
+        print("message_to: {}".format(message_to))
 
-        print("message_dst: {}".format(message_dst))
+        data = client_socket.recv(DATA_LENGTH)
 
-        try:
-            data = client_socket.recv(int(message_length.decode('utf-8')) + 1)
-        except Exception as e:
-            print(str(e))
+        print(data)
+
+        # try:
+        #     data = client_socket.recv(int(message_length.decode('utf-8')) + 1)
+        # except Exception as e:
+        #     print(str(e))
 
         # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
-        if not len(message_length):
+        if not data:
             return False
 
         # Convert header to int value
-        message_length = int(message_length.decode('utf-8').strip())
+        # message_length = int(data.decode('utf-8').strip())
 
         # Return an object of message header and message data
-        return {'header': message_length, 'type':message_type, 'broadcast': message_dst, 'data': data}
+        return {'header': DATA_LENGTH, 'opcode': message_opcode, "from": message_from, 'to': message_to, 'data': data}
 
-    except:
+    except Exception as e:
         # If we are here, client closed connection violently, for example by pressing ctrl+c on his script
         # or just lost his connection
         # socket.close() also invokes socket.shutdown(socket.SHUT_RDWR) what sends information about closing the socket (shutdown read/write)
         # and that's also a cause when we receive an empty message
+        print(str(e))
         return False
 
 def new_user(client_socket):
     try:
         # Receive our "header" containing message length, it's size is defined and constant
-        message_header = client_socket.recv(HEADER_LENGTH)
+        message_header = client_socket.recv(DATA_LENGTH)
 
         # If we received no data, client gracefully closed a connection, for example using socket.close() or socket.shutdown(socket.SHUT_RDWR)
         if not len(message_header):
@@ -146,7 +157,7 @@ while True:
             # Get user by notified socket, so we will know who sent the message
             user = clients[notified_socket]
 
-            print(f'Received message from {user["data"].decode("utf-8")} to {message["broadcast"]}: {message["data"].decode("utf-8")}')
+            print(f'Received message from {user["data"].decode("utf-8")} to {message["to"]}: {message["data"].decode("utf-8")}')
 
             # Iterate over connected clients and broadcast message
 
@@ -154,22 +165,29 @@ while True:
                 # But don't sent it to sender
                 if client_socket != notified_socket:
                     # size of user sender
-                    usr_header_length = user['header']
+                    # usr_header_length = user['header']
+                    # size of user sender
+                    message_opcode = f"{(message['opcode']):<{MSG_OPCODE}}".encode('utf-8')
+                    # size of user sender
+                    message_from = f"{(message['from']):<{USER_LENGTH}}".encode('utf-8')
+                    # size of user sender
+                    message_to = f"{(message['to']):<{USER_LENGTH}}".encode('utf-8')
                     # name of user sender
-                    usr_sender = user['data']
+                    # usr_sender = user['data']
                     # size of sending message
-                    data_length = f"{(message['header']):<{HEADER_LENGTH}}".encode('utf-8')
+                    # data_length = f"{(message['header']):<{DATA_LENGTH}}".encode('utf-8')
 
                     # Send user and message (both with their headers)
                     # We are reusing here message header sent by sender, and saved username header send by user when he connected
-                    if message["broadcast"] == "ALL":
-                        client_socket.send(usr_header_length + usr_sender + data_length + message['data'])
+                    if message["to"] == "ALL":
+                        client_socket.send(message_opcode + message_from + message_to + message['data'])
 
-                    elif clients[client_socket]['data'].decode('utf-8') == message["broadcast"]:
-                        target_info = str(client_socket).split("raddr=(")[1].split(")")[0].split(", ")
-                        target_ip = target_info[0]
-                        target_port = target_info[1]
-                        client_socket.send(usr_header_length + usr_sender + data_length + message['data'])
+                    elif clients[client_socket]['data'].decode('utf-8') == message["to"]:
+                        # target_info = str(client_socket).split("raddr=(")[1].split(")")[0].split(", ")
+                        # target_ip = target_info[0]
+                        # target_port = target_info[1]
+                        # client_socket.send(usr_header_length + usr_sender + data_length + message['data'])
+                        client_socket.send(message_opcode + message_from + message_to + message['data'])
 
                     else:
                         print("nao bateu: {}".format(clients[client_socket]['data']))
